@@ -2,28 +2,27 @@
 <html lang="zh-TW">
 
 <head>
-	<title>three.js webgl - loader - ttf</title>
+	<title>高等計算機圖學</title>
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
 	<link type="text/css" rel="stylesheet" href="main.css" />
 </head>
 
 <body>
-	<div id="info">
+	<!-- <div id="info">
 		<a href="https://threejs.org" target="_blank" rel="noopener">three.js</a>
 		- TTFLoader using opentype by gero3 <br />type to enter new text, drag to
 		spin the text
-	</div>
+	</div> -->
 
 	<script src="./opentype.min.js"></script>
 	<script src="./three.min.js"></script>
 	<script src="./TTFLoader.js"></script>
-	<script src="./FontLoader.js"></script>
 
 	<script>
 		let container;
 		let camera, cameraTarget, scene, renderer;
-		let group, textMesh1, textMesh2, textGeo, material;
+		let group, textMesh1, textMesh2, textGeo, material, floorGroup;
 		let firstLetter = true;
 		var ttfPath = './openhuninn-1.1.ttf'
 
@@ -36,25 +35,33 @@
 			bevelSize = 1.5;
 
 		let font = null;
-		const mirror = true;
+		const mirror = false;
+		const raycaster = new THREE.Raycaster();
+		const mouse = new THREE.Vector2();
+		let INTERSECTED;
 
 		let targetRotation = 0;
 		let targetRotationOnPointerDown = 0;
 
 		let pointerX = 0;
 		let pointerXOnPointerDown = 0;
+		let pointerY = 0;
+		let pointerYOnPointerDown = 0;
+
 
 		let windowHalfX = window.innerWidth / 2;
+		let windowHalfY = window.innerHeight / 2;
 
 		init();
-		animate();
+		window.requestAnimationFrame(animate);
+
+		//animate();
 
 		function init() {
 			container = document.createElement("div");
 			document.body.appendChild(container);
 
 			// CAMERA
-
 			camera = new THREE.PerspectiveCamera(
 				30,
 				window.innerWidth / window.innerHeight,
@@ -62,69 +69,83 @@
 				1500
 			);
 			camera.position.set(0, 400, 700);
-
 			cameraTarget = new THREE.Vector3(0, 150, 0);
 
 			// SCENE
-
 			scene = new THREE.Scene();
 			scene.background = new THREE.Color(0x000000);
 			scene.fog = new THREE.Fog(0x000000, 250, 1400);
 
 			// LIGHTS
-
 			const dirLight = new THREE.DirectionalLight(0xffffff, 0.125);
 			dirLight.position.set(0, 0, 1).normalize();
 			scene.add(dirLight);
-
 			const pointLight = new THREE.PointLight(0xffffff, 1.5);
-			pointLight.position.set(0, 100, 90);
-			pointLight.color.setHSL(Math.random(), 1, 0.5);
+			pointLight.position.set(0, 100, 150);
+			//pointLight.color.setHSL(1, 0.5, 1);
 			scene.add(pointLight);
 
 			material = new THREE.MeshPhongMaterial({
-				color: 0xffffff,
+				color: 0x03a5fc,
 				flatShading: true,
 			});
 
 			group = new THREE.Group();
 			group.position.y = 100;
+			group.position.z = -100;
+			floorGroup = new THREE.Group();
 
 			scene.add(group);
+			scene.add(floorGroup);
 
+			//text
 			const loader = new THREE.TTFLoader();
-
 			loader.load(ttfPath, function (json) {
-				console.log(json);
+				//console.log(json);
 				font = new THREE.Font(json);
 				createText("子", 0, 180);
-				createText("丑", 90*Math.sin(Math.PI/6), 90 + 90*Math.cos(Math.PI/6));
-				createText("寅", 90*Math.sin(Math.PI/3), 90 + 90*Math.cos(Math.PI/3));
+				createText("丑", 90 * Math.sin(Math.PI / 6), 90 + 90 * Math.cos(Math.PI / 6));
+				createText("寅", 90 * Math.sin(Math.PI / 3), 90 + 90 * Math.cos(Math.PI / 3));
 				createText("卯", 90, 90);
-				createText("辰", 90*Math.sin(Math.PI/3), 90 - 90*Math.cos(Math.PI/3));
-				createText("巳", 90*Math.sin(Math.PI/6), 90 - 90*Math.cos(Math.PI/6));
+				createText("辰", 90 * Math.sin(Math.PI / 3), 90 - 90 * Math.cos(Math.PI / 3));
+				createText("巳", 90 * Math.sin(Math.PI / 6), 90 - 90 * Math.cos(Math.PI / 6));
 				createText("午", 0, 0);
-				createText("未", -90*Math.sin(Math.PI/6), 90 - 90*Math.cos(Math.PI/6));
-				createText("申", -90*Math.sin(Math.PI/3), 90 - 90*Math.cos(Math.PI/3));
+				createText("未", -90 * Math.sin(Math.PI / 6), 90 - 90 * Math.cos(Math.PI / 6));
+				createText("申", -90 * Math.sin(Math.PI / 3), 90 - 90 * Math.cos(Math.PI / 3));
 				createText("酉", -90, 90);
-				createText("戌", -90*Math.sin(Math.PI/3), 90 + 90*Math.cos(Math.PI/3));
-				createText("亥", -90*Math.sin(Math.PI/6), 90 + 90*Math.cos(Math.PI/6));
+				createText("戌", -90 * Math.sin(Math.PI / 3), 90 + 90 * Math.cos(Math.PI / 3));
+				createText("亥", -90 * Math.sin(Math.PI / 6), 90 + 90 * Math.cos(Math.PI / 6));
+
+				titleText();
 			});
 
+			//floor plane
 			const plane = new THREE.Mesh(
-				new THREE.PlaneGeometry(10000, 10000),
+				new THREE.PlaneGeometry(1500, 1500),
 				new THREE.MeshBasicMaterial({
 					color: 0xffffff,
-					opacity: 0.5,
+					opacity: 0.4,
 					transparent: true,
 				})
 			);
-			plane.position.y = 100;
+			plane.position.y = 0;
 			plane.rotation.x = -Math.PI / 2;
-			scene.add(plane);
+			floorGroup.add(plane);
+
+			//back circle
+			const circle = new THREE.Mesh(
+				new THREE.CylinderGeometry(110, 110, 3, 320),
+				new THREE.MeshBasicMaterial({
+					color: 0x3464eb,
+					opacity: 0.3,
+					transparent: true,
+				}));
+			circle.position.y = 220;
+			circle.position.z = -10;
+			circle.rotation.x = -Math.PI / 2;
+			scene.add(circle);
 
 			// RENDERER
-
 			renderer = new THREE.WebGLRenderer({
 				antialias: true
 			});
@@ -133,14 +154,39 @@
 			container.appendChild(renderer.domElement);
 
 			// EVENTS
-
 			container.style.touchAction = "none";
-			container.addEventListener("pointerdown", onPointerDown);
-
-			//document.addEventListener("keypress", onDocumentKeyPress);
-			//document.addEventListener("keydown", onDocumentKeyDown);
+			//container.addEventListener("pointerdown", onPointerDown);
 
 			window.addEventListener("resize", onWindowResize);
+			window.addEventListener("mousemove", onMouseMove, false);
+			window.addEventListener("mousedown", onMouseDown, false);
+			//console.log(group)
+
+		}
+
+		function onMouseDown(event) {
+
+			raycaster.setFromCamera(mouse, camera);
+			// calculate objects intersecting the picking ray
+			const intersects = raycaster.intersectObjects(group.children, false);
+			if (intersects.length > 0) {
+				var intersection = intersects[0];
+				let hw;
+				if (group.children.indexOf(intersection.object) + 1 < 10) {
+					hw = "0".concat(String(group.children.indexOf(intersection.object) + 1));
+				}
+				else {
+					hw = String(group.children.indexOf(intersection.object) + 1);
+				}
+				//console.log(hw);
+				window.open(`https://ntut-cg-lab.github.io/cg2021f-hw${hw}-astawang0623/`);
+
+			}
+		}
+
+		function onMouseMove(event) {
+			mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+			mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
 		}
 
 		function onWindowResize() {
@@ -150,41 +196,6 @@
 			camera.updateProjectionMatrix();
 
 			renderer.setSize(window.innerWidth, window.innerHeight);
-		}
-
-		function onDocumentKeyDown(event) {
-			if (firstLetter) {
-				firstLetter = false;
-				text = "";
-			}
-
-			const keyCode = event.keyCode;
-
-			// backspace
-
-			if (keyCode === 8) {
-				event.preventDefault();
-
-				text = text.substring(0, text.length - 1);
-				refreshText();
-
-				return false;
-			}
-		}
-
-		function onDocumentKeyPress(event) {
-			const keyCode = event.which;
-
-			// backspace
-
-			if (keyCode === 8) {
-				event.preventDefault();
-			} else {
-				const ch = String.fromCharCode(keyCode);
-				text += ch;
-
-				refreshText();
-			}
 		}
 
 		function createText(input_text, x, y) {
@@ -203,44 +214,35 @@
 
 			const centerOffset = -0.5 * (textGeo.boundingBox.max.x - textGeo.boundingBox.min.x);
 
-			textMesh1 = new THREE.Mesh(textGeo, material);
+			textMesh1 = new THREE.Mesh(textGeo, new THREE.MeshPhongMaterial({
+				color: 0x03a5fc,
+				flatShading: true,
+			}));
 
-			textMesh1.position.x = x + centerOffset;//centerOffset;
-			textMesh1.position.y = y;//hover;
+			textMesh1.position.x = x + centerOffset; //centerOffset;
+			textMesh1.position.y = y; //hover;
 			textMesh1.position.z = 0;
-
 			textMesh1.rotation.x = 0;
 			textMesh1.rotation.y = Math.PI * 2;
-
 			group.add(textMesh1);
 
 			if (mirror) {
 				textMesh2 = new THREE.Mesh(textGeo, material);
 
-				textMesh2.position.x = x + centerOffset;//centerOffset;
-				textMesh2.position.y = -y//-hover;
+				textMesh2.position.x = x + centerOffset; //centerOffset;
+				textMesh2.position.y = -y //-hover;
 				textMesh2.position.z = height;
-
 				textMesh2.rotation.x = Math.PI;
 				textMesh2.rotation.y = Math.PI * 2;
-
 				group.add(textMesh2);
 			}
-		}
-
-		function refreshText() {
-			group.remove(textMesh1);
-			if (mirror) group.remove(textMesh2);
-
-			if (!text) return;
-
-			createText();
 		}
 
 		function onPointerDown(event) {
 			if (event.isPrimary === false) return;
 
 			pointerXOnPointerDown = event.clientX - windowHalfX;
+			pointerYOnPointerDown = event.clientY - windowHalfY;
 			targetRotationOnPointerDown = targetRotation;
 
 			document.addEventListener("pointermove", onPointerMove);
@@ -264,7 +266,6 @@
 			document.removeEventListener("pointerup", onPointerUp);
 		}
 
-		//
 
 		function animate() {
 			requestAnimationFrame(animate);
@@ -272,8 +273,53 @@
 			group.rotation.y += (targetRotation - group.rotation.y) * 0.05;
 
 			camera.lookAt(cameraTarget);
+			raycaster.setFromCamera(mouse, camera);
+			// calculate objects intersecting the picking ray
+			const intersects = raycaster.intersectObjects(group.children, false);
 
+			if (intersects.length > 0) {
+				if (INTERSECTED != intersects[0].object) {
+					if (INTERSECTED) INTERSECTED.material.color.setHex(INTERSECTED.currentHex);
+
+					INTERSECTED = intersects[0].object;
+					INTERSECTED.currentHex = INTERSECTED.material.color.getHex();
+					INTERSECTED.material.color.setHex(0xff0000);
+
+				}
+			} else {
+				if (INTERSECTED) INTERSECTED.material.color.setHex(INTERSECTED.currentHex);
+
+				INTERSECTED = null;
+			}
 			renderer.render(scene, camera);
+		}
+
+		function titleText() {
+			//another text
+			textGeo = new THREE.TextGeometry("高等計算機圖學", {
+				font: font,
+				size: size * 1.3,
+				height: height / 3,
+				curveSegments: curveSegments,
+				bevelThickness: bevelThickness,
+				bevelSize: bevelSize,
+				bevelEnabled: true,
+			});
+			textGeo.computeBoundingBox();
+			textGeo.computeVertexNormals();
+			const centerOffset = -0.5 * (textGeo.boundingBox.max.x - textGeo.boundingBox.min.x);
+
+			titleMesh = new THREE.Mesh(textGeo, new THREE.MeshPhongMaterial({
+				color: 0x3a76de,
+				flatShading: false,
+			}));
+
+			//transfer
+			titleMesh.position.x = centerOffset; //centerOffset;
+			titleMesh.position.y = 90; //hover;
+			titleMesh.position.z = 80;
+			titleMesh.rotation.x = -Math.PI / 3;
+			scene.add(titleMesh);
 		}
 	</script>
 </body>
